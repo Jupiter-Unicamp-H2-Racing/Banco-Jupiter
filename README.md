@@ -232,11 +232,5 @@ Apoio: `errors/` (exceções com código e tradução, mais o tradutor erro → 
 
 **Identificadores públicos separados dos internos.** Chaves de API são UUIDs (`customer_key`, `account_key`, `transaction_key`); as chaves primárias numéricas nunca saem na resposta. É por elas, porém, que se define a ordem de lock.
 
-## Entrega: repositório público em 13/10
-
-Na entrega de **13/10**, o repositório precisa estar **público**. Antes de enviar:
-
-1. No GitHub, em *Settings → General → Danger Zone → Change visibility*, deixe como **Public**.
-2. Abra a URL do repositório numa **janela anônima** (sem login). Se o código aparece, está público.
-3. Confirme que nada sensível foi versionado: `git ls-files | grep -E '(^|/)\.env$'` não deve listar nada (só `.env.example` é versionado, e ele contém apenas valores de exemplo).
+ersionado, e ele contém apenas valores de exemplo).
 4. Confirme que o `README.md` e o `docker compose up` funcionam a partir de um clone novo.
