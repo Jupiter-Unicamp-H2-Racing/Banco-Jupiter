@@ -151,3 +151,11 @@ class InvalidDateRange(QIException):
             f"start_date ({start_date}) must be less than or equal to end_date ({end_date}).",
             "A data inicial do extrato deve ser anterior ou igual à data final.",
         )
+
+class CustomerNotActive(QIException):
+    code = "QIT001009"
+
+    def __init__(self, customer_key, current_status):
+        super().__init__("Customer is not active", self.code, 422,
+                         f"Customer {customer_key} has status {current_status}.",
+                         "Somente clientes ativos podem criar contas.")

@@ -53,6 +53,7 @@ CREATE TABLE customer_status_event (
 CREATE TABLE account (
     id BIGSERIAL PRIMARY KEY,
     account_key CHAR(36) NOT NULL UNIQUE,
+    customer_id INTEGER NOT NULL REFERENCES customer(id),
     balance BIGINT NOT NULL DEFAULT 0,
     tier_code VARCHAR(20) NOT NULL DEFAULT 'STANDARD',
     monthly_free_transfers_limit INTEGER NOT NULL DEFAULT 5,
@@ -61,6 +62,8 @@ CREATE TABLE account (
     CONSTRAINT ck_account_balance_nonnegative CHECK (balance >= 0),
     CONSTRAINT ck_account_free_limit_nonnegative CHECK (monthly_free_transfers_limit >= 0)
 );
+
+CREATE INDEX ix_account_customer_id ON account(customer_id);
 
 -- 5. Transferencias: fee_amount registra a tarifa efetivamente cobrada, inclusive zero.
 CREATE TABLE "transaction" (

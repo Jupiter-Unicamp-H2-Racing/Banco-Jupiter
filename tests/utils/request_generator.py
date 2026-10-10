@@ -43,3 +43,34 @@ class RequestGenerator:
             "GET", "/customers", headers={"INTERNAL-TOKEN": INTERNAL_TOKEN}, query_params=params
         )
         return response.response_status, response.response_json
+
+    @staticmethod
+    def POST_account(payload: dict, headers: dict = None):
+        response = ClientRequisition.send(
+            "POST", "/accounts", payload=payload,
+            headers={"INTERNAL-TOKEN": INTERNAL_TOKEN} if headers is None else headers,
+        )
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def GET_account(account_key: str):
+        response = ClientRequisition.send(
+            "GET", f"/accounts/{account_key}", headers={"INTERNAL-TOKEN": INTERNAL_TOKEN}
+        )
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def POST_transaction(source_account_key: str, payload: dict, headers: dict = None):
+        response = ClientRequisition.send(
+            "POST", f"/accounts/{source_account_key}/transactions", payload=payload,
+            headers={"INTERNAL-TOKEN": INTERNAL_TOKEN} if headers is None else headers,
+        )
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def GET_transactions(account_key: str, params: dict = None):
+        response = ClientRequisition.send(
+            "GET", f"/accounts/{account_key}/transactions",
+            headers={"INTERNAL-TOKEN": INTERNAL_TOKEN}, query_params=params,
+        )
+        return response.response_status, response.response_json

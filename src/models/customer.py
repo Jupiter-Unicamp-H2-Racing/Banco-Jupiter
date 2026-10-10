@@ -17,4 +17,5 @@ class Customer(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     status = relationship("CustomerStatus", back_populates="customers", lazy="selectin")
+    accounts = relationship("Account", back_populates="customer", lazy="selectin")
     status_events = relationship("CustomerStatusEvent", back_populates="customer", order_by="CustomerStatusEvent.event_datetime", cascade="all, delete-orphan", lazy="selectin")

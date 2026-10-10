@@ -13,7 +13,7 @@ def test_customer_age_boundaries_are_explicit():
 
 
 def test_customer_statuses_match_database_seed_values():
-    sql = Path("/database/database.sql").read_text(encoding="utf-8")
+    sql = (Path(__file__).resolve().parents[2] / "database" / "database.sql").read_text(encoding="utf-8")
     expected = {"pending_kyc", "active", "blocked", "inactive"}
     assert set(CustomerStatus.ALLOWED) == expected
     for status in expected:
@@ -21,6 +21,6 @@ def test_customer_statuses_match_database_seed_values():
 
 
 def test_all_json_schemas_parse():
-    for schema_path in Path("src/schemas").glob("*.json"):
+    for schema_path in (Path(__file__).resolve().parents[2] / "src" / "schemas").glob("*.json"):
         with schema_path.open(encoding="utf-8") as schema_file:
             assert isinstance(json.load(schema_file), dict)

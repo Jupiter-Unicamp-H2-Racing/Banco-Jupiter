@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from database import Context
 from models.account import Account
 
@@ -23,3 +25,13 @@ class AccountRepository:
 
     def update_balance(self, account: Account, new_balance: int) -> None:
         account.balance = new_balance
+
+    def create(self, customer_id: int, initial_balance: int = 0, account_key: str = None) -> Account:
+        account = Account(
+            account_key=account_key or str(uuid4()),
+            customer_id=customer_id,
+            balance=initial_balance,
+        )
+        self.session.add(account)
+        self.session.flush()
+        return account

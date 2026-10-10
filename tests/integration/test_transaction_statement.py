@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy import create_engine, text
 
 from tests.utils.db_utils import DbUtils
+from tests.utils.object_generator import ObjectGenerator
 from tests.utils.requisition import ClientRequisition
 
 
@@ -13,20 +14,24 @@ HEADERS = {"INTERNAL-TOKEN": INTERNAL_TOKEN}
 
 def _seed_statement():
     DbUtils.rollback()
+    customer_key = ObjectGenerator.create_active_customer()
     engine = create_engine(DbUtils.database_url())
     source_key, destination_key, third_key = str(uuid4()), str(uuid4()), str(uuid4())
     with engine.begin() as connection:
+        customer_id = connection.execute(
+            text("SELECT id FROM customer WHERE customer_key = :key"), {"key": customer_key}
+        ).scalar_one()
         source_id = connection.execute(
-            text("INSERT INTO account (account_key, balance) VALUES (:key, 100000) RETURNING id"),
-            {"key": source_key},
+            text("INSERT INTO account (account_key, balance, customer_id) VALUES (:key, 100000, :customer_id) RETURNING id"),
+            {"key": source_key, "customer_id": customer_id},
         ).scalar_one()
         destination_id = connection.execute(
-            text("INSERT INTO account (account_key, balance) VALUES (:key, 100000) RETURNING id"),
-            {"key": destination_key},
+            text("INSERT INTO account (account_key, balance, customer_id) VALUES (:key, 100000, :customer_id) RETURNING id"),
+            {"key": destination_key, "customer_id": customer_id},
         ).scalar_one()
         third_id = connection.execute(
-            text("INSERT INTO account (account_key, balance) VALUES (:key, 100000) RETURNING id"),
-            {"key": third_key},
+            text("INSERT INTO account (account_key, balance, customer_id) VALUES (:key, 100000, :customer_id) RETURNING id"),
+            {"key": third_key, "customer_id": customer_id},
         ).scalar_one()
         for transaction_source, transaction_destination, amount, fee, created, key in [
             (source_id, destination_id, 1000, 100, "2026-01-01T10:00:00+00:00", str(uuid4())),
