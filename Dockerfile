@@ -29,7 +29,8 @@ RUN pip install -r /requirements-dev.txt
 
 # Copia os testes para dentro do container
 COPY tests /tests
-
+# Copia os testes e a configuracao do pytest
+COPY pytest.ini /pytest.ini
 # Configura o diretorio de trabalho dos testes
 ENV PYTHONPATH=/app:/
 
