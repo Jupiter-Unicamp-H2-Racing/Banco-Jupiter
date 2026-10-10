@@ -159,3 +159,14 @@ class CustomerNotActive(QIException):
         super().__init__("Customer is not active", self.code, 422,
                          f"Customer {customer_key} has status {current_status}.",
                          "Somente clientes ativos podem criar contas.")
+class IdempotencyConflict(QIException):
+    code = "QIT002006"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Idempotency Conflict",
+            self.code,
+            409,
+            "The idempotency key was already used for a different transfer.",
+            "A chave de idempotência já foi usada para outra transferência.",
+        )

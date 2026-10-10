@@ -9,13 +9,24 @@ from utils.schema_handler import SchemaHandler
 
 class TransactionResource:
     @SchemaHandler.validate("post_transaction.json")
-    def on_post(self, account_key: str, payload: dict) -> JSONResponse:
-        transaction = TransactionController().create(account_key, payload)
+    def on_post(
+        self,
+        account_key: str,
+        payload: dict,
+        request: Request,
+    ) -> JSONResponse:
+        idempotency_key = request.headers.get("Idempotency-Key")
+
+        transaction = TransactionController().create(
+            account_key,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
         return JSONResponse(
             content=jsonable_encoder(transaction),
             status_code=http_status.HTTP_201_CREATED,
         )
-
     @SchemaHandler.validate_query_params("get_transactions.json")
     def on_get_list(self, account_key: str, request: Request) -> JSONResponse:
         params = request.query_params

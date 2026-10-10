@@ -10,6 +10,20 @@ class TransactionRepository:
     def __init__(self, context: Context) -> None:
         self.session = context.db_session
 
+    def get_by_idempotency_key(
+        self,
+        source_account_id: int,
+        idempotency_key: str,
+    ) -> Transaction | None:
+        return (
+            self.session.query(Transaction)
+            .filter(
+                Transaction.source_account_id == source_account_id,
+                Transaction.idempotency_key == idempotency_key,
+            )
+            .first()
+        )
+
     def count_source_transfers(self, source_account_id: int, period_start: datetime, period_end: datetime) -> int:
         return (
             self.session.query(Transaction)

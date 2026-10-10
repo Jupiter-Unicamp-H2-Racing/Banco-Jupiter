@@ -69,12 +69,15 @@ CREATE INDEX ix_account_customer_id ON account(customer_id);
 CREATE TABLE "transaction" (
     id BIGSERIAL PRIMARY KEY,
     transaction_key CHAR(36) NOT NULL UNIQUE,
+    idempotency_key VARCHAR(255),
     source_account_id BIGINT NOT NULL REFERENCES account(id),
     destination_account_id BIGINT NOT NULL REFERENCES account(id),
     amount BIGINT NOT NULL,
     fee_amount BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
+    CONSTRAINT uq_transaction_source_idempotency
+        UNIQUE (source_account_id, idempotency_key),
     CONSTRAINT ck_transaction_amount_positive CHECK (amount > 0),
     CONSTRAINT ck_transaction_fee_nonnegative CHECK (fee_amount >= 0),
     CONSTRAINT ck_transaction_accounts_different CHECK (source_account_id <> destination_account_id)
