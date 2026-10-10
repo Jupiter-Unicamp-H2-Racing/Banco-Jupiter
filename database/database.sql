@@ -78,4 +78,6 @@ CREATE TABLE "transaction" (
 );
 
 CREATE INDEX ix_transaction_source_created_at
-    ON "transaction" (source_account_id, created_at);
+    ON "transaction" (source_account_id, created_at DESC, id DESC);
+CREATE INDEX ix_transaction_destination_created_at
+    ON "transaction" (destination_account_id, created_at DESC, id DESC);

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from uuid import uuid4
 
 from controllers.base_controller import BaseController
@@ -6,6 +6,8 @@ from dtos.transaction_dto import TransactionDTO
 from errors.custom_errors import (
     AccountNotFound,
     InsufficientBalance,
+    InvalidDateRange,
+    InvalidStatementDate,
     InvalidTransfer,
 )
 from models.transaction import Transaction
@@ -17,11 +19,44 @@ from utils.transaction_fee import (
     calculate_fee,
 )
 
+
 class TransactionController(BaseController):
     def __init__(self) -> None:
         super().__init__(__name__)
         self.account_repository = AccountRepository(self.context)
         self.transaction_repository = TransactionRepository(self.context)
+
+    def list(self, account_key: str, limit: int = 20, page: int = 1,
+             start_date: str = None, end_date: str = None) -> dict:
+        account = self._ensure_account_access(account_key)
+        parsed_start = self._parse_statement_date(start_date) if start_date else None
+        parsed_end = self._parse_statement_date(end_date) if end_date else None
+        if parsed_start is not None and parsed_end is not None and parsed_start > parsed_end:
+            raise InvalidDateRange(start_date, end_date)
+
+        start_datetime = datetime.combine(parsed_start, time.min, tzinfo=timezone.utc) if parsed_start else None
+        end_datetime = datetime.combine(parsed_end + timedelta(days=1), time.min,
+                                        tzinfo=timezone.utc) if parsed_end else None
+        rows = self.transaction_repository.list_by_account(
+            account.id, limit, (page - 1) * limit, start_datetime, end_datetime
+        )
+        total_items = self.transaction_repository.count_by_account(account.id, start_datetime, end_datetime)
+        return TransactionDTO.list_to_dict(rows, account.id, page, limit, total_items)
+
+    def _ensure_account_access(self, account_key: str):
+        # Hoje não há identidade de cliente autenticado; no futuro, verificar
+        # autorização aqui e usar o mesmo 404 para contas inexistentes/terceiras.
+        account = self.account_repository.get_by_key(account_key)
+        if account is None:
+            raise AccountNotFound(account_key)
+        return account
+
+    @staticmethod
+    def _parse_statement_date(value: str) -> date:
+        try:
+            return date.fromisoformat(value)
+        except (TypeError, ValueError) as exc:
+            raise InvalidStatementDate(value) from exc
 
     def create(self, source_account_key: str, payload: dict) -> dict:
         amount = payload["amount"]

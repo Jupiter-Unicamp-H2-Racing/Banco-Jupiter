@@ -129,3 +129,25 @@ class OverAgeCustomer(QIException):
         super().__init__("Customer age exceeds limit", self.code, 422,
                          f"The customer is {age} years old; maximum age is {maximum_age}.",
                          f"A idade máxima para cadastro é {maximum_age} anos.")
+
+
+class InvalidStatementDate(QIException):
+    code = "QIT002004"
+
+    def __init__(self, value) -> None:
+        super().__init__(
+            "Invalid Statement Date", self.code, 422,
+            f"The statement date {value} is not a real calendar date.",
+            "A data informada para o extrato não é uma data válida.",
+        )
+
+
+class InvalidDateRange(QIException):
+    code = "QIT002005"
+
+    def __init__(self, start_date, end_date) -> None:
+        super().__init__(
+            "Invalid Statement Date Range", self.code, 422,
+            f"start_date ({start_date}) must be less than or equal to end_date ({end_date}).",
+            "A data inicial do extrato deve ser anterior ou igual à data final.",
+        )

@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
     application.add_api_route("/customers/{customer_key}", customers.on_get_by_key, methods=["GET"])
     application.add_api_route("/customers/{customer_key}", customers.on_put_by_key, methods=["PUT"])
     application.add_api_route("/accounts/{account_key}/transactions", transactions.on_post, methods=["POST"])
+    application.add_api_route("/accounts/{account_key}/transactions", transactions.on_get_list, methods=["GET"])
     register_error_handlers(application)
     return application
 

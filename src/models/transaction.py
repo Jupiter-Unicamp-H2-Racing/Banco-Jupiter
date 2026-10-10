@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, CHAR, CheckConstraint, Column, DateTime, ForeignKey, Integer, Index, func
+from sqlalchemy import BigInteger, CHAR, CheckConstraint, Column, DateTime, ForeignKey, Index, desc, func
 from models.base import Base
 
 
@@ -17,5 +17,6 @@ class Transaction(Base):
         CheckConstraint("amount > 0", name="ck_transaction_amount_positive"),
         CheckConstraint("fee_amount >= 0", name="ck_transaction_fee_nonnegative"),
         CheckConstraint("source_account_id <> destination_account_id", name="ck_transaction_accounts_different"),
-        Index("ix_transaction_source_created_at", "source_account_id", "created_at"),
+        Index("ix_transaction_source_created_at", "source_account_id", desc("created_at"), desc("id")),
+        Index("ix_transaction_destination_created_at", "destination_account_id", desc("created_at"), desc("id")),
     )

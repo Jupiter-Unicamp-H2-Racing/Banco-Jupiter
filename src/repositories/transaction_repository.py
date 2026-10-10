@@ -1,5 +1,8 @@
 from datetime import datetime
+from sqlalchemy import case, or_
+from sqlalchemy.orm import aliased
 from database import Context
+from models.account import Account
 from models.transaction import Transaction
 
 
@@ -22,3 +25,37 @@ class TransactionRepository:
         self.session.add(transaction)
         self.session.flush()
         return transaction
+
+    def list_by_account(self, account_id: int, limit: int, offset: int,
+                        start_date=None, end_date=None) -> list:
+        source = aliased(Account)
+        destination = aliased(Account)
+        query = (
+            self.session.query(
+                Transaction,
+                case(
+                    (Transaction.source_account_id == account_id, destination.account_key),
+                    else_=source.account_key,
+                ).label("counterparty_account_key"),
+            )
+            .join(source, source.id == Transaction.source_account_id)
+            .join(destination, destination.id == Transaction.destination_account_id)
+            .filter(or_(Transaction.source_account_id == account_id,
+                        Transaction.destination_account_id == account_id))
+        )
+        if start_date is not None:
+            query = query.filter(Transaction.created_at >= start_date)
+        if end_date is not None:
+            query = query.filter(Transaction.created_at < end_date)
+        return query.order_by(Transaction.created_at.desc(), Transaction.id.desc()).limit(limit).offset(offset).all()
+
+    def count_by_account(self, account_id: int, start_date=None, end_date=None) -> int:
+        query = self.session.query(Transaction).filter(
+            or_(Transaction.source_account_id == account_id,
+                Transaction.destination_account_id == account_id)
+        )
+        if start_date is not None:
+            query = query.filter(Transaction.created_at >= start_date)
+        if end_date is not None:
+            query = query.filter(Transaction.created_at < end_date)
+        return query.count()

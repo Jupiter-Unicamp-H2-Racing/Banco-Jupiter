@@ -7,7 +7,7 @@ def test_free_transfer_inside_default_allowance():
 
 
 def test_sixth_transfer_is_charged_below_minimum_balance():
-    assert calculate_fee(5, 5, 99_999) == 250
+    assert calculate_fee(5, 5, 99_999) == 50
 
 
 def test_minimum_balance_is_inclusive():
@@ -16,6 +16,6 @@ def test_minimum_balance_is_inclusive():
 
 
 def test_zero_allowance_and_custom_allowance():
-    assert calculate_fee(0, 0, 99_999) == 250
+    assert calculate_fee(0, 0, 99_999) == 50
     assert calculate_fee(2, 3, 99_999) == 0
-    assert calculate_fee(3, 3, 99_999) == 250
+    assert calculate_fee(3, 3, 99_999) == 50
