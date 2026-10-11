@@ -47,7 +47,24 @@ def check_variables():
 
     if missing:
         raise EnvironmentError(
-            f"Faltam variáveis de ambiente: {', '.join(missing)}. "
-            "Rodando com 'docker compose up' elas já vêm preenchidas. "
-            "Fora do Docker, copie o .env.example para .env."
+            f"Faltam variáveis de ambiente obrigatórias: {', '.join(missing)}. "
+            "Configure-as explicitamente no ambiente ou no arquivo .env."
         )
+
+    if APP_ENV.lower() in {"production", "prod"} and INTERNAL_TOKEN.strip() in {
+        "default_token", "troque-por-um-token-aleatorio"
+    }:
+        raise EnvironmentError(
+            "INTERNAL_TOKEN não pode usar o valor de exemplo em produção. "
+            "Configure uma credencial forte por variável de ambiente."
+        )
+
+# Conta interna que recebe as tarifas de transferência.
+FEE_REVENUE_ACCOUNT_KEY = "00000000-0000-4000-8000-000000000001"
+FEE_REVENUE_CUSTOMER_KEY = "00000000-0000-4000-8000-000000000002"
+
+DEFAULT_LIMIT = 10
+DEFAULT_PAGE = 1
+MAX_LIMIT = 100
+MAX_BALANCE = 2**63 - 1
+BUSINESS_TIMEZONE = os.environ.get("BUSINESS_TIMEZONE", "America/Sao_Paulo")

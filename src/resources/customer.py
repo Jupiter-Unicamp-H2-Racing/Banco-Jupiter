@@ -1,37 +1,28 @@
-from fastapi import Request
+from fastapi import Depends, Request
 from fastapi import status as http_status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from controllers.customer_controller import CustomerController
+from database import get_db
 from utils.schema_handler import SchemaHandler
 
-DEFAULT_LIMIT = 10
-DEFAULT_PAGE = 1
 
 class CustomerResource:
     @SchemaHandler.validate("post_customer.json")
-    def on_post(self, payload: dict) -> JSONResponse:
-        result = CustomerController().create(payload)
+    def on_post(self, payload: dict, db=Depends(get_db)) -> JSONResponse:
+        result = CustomerController(db).create(payload)
         return JSONResponse(content=jsonable_encoder(result), status_code=http_status.HTTP_201_CREATED)
 
-    def on_get_by_key(self, customer_key: str) -> JSONResponse:
-        result = CustomerController().get_by_key(customer_key)
+    def on_get_by_key(self, customer_key: str, db=Depends(get_db)) -> JSONResponse:
+        result = CustomerController(db).get_by_key(customer_key)
         return JSONResponse(content=jsonable_encoder(result), status_code=http_status.HTTP_200_OK)
 
     @SchemaHandler.validate("put_customer.json")
-    def on_put_by_key(self, customer_key: str, payload: dict) -> JSONResponse:
-        result = CustomerController().update_status(customer_key, payload["status"])
-        return JSONResponse(content=jsonable_encoder(result), status_code=http_status.HTTP_202_ACCEPTED)
+    def on_put_by_key(self, customer_key: str, payload: dict, db=Depends(get_db)) -> JSONResponse:
+        result = CustomerController(db).update_status(customer_key, payload["status"])
+        return JSONResponse(content=jsonable_encoder(result), status_code=http_status.HTTP_200_OK)
 
     @SchemaHandler.validate_query_params("get_customer.json")
-    def on_get_list(self, request: Request) -> JSONResponse:
-        params = request.query_params
-        limit = int(params.get("limit", DEFAULT_LIMIT))
-        page = int(params.get("page", DEFAULT_PAGE))
-        filters = {"status_enumerators": params.getlist("status"), "name": params.get("name"),
-                   "email": params.get("email"), "document_number": params.get("document_number"),
-                   "birthdate_from": params.get("birthdate_from"), "birthdate_to": params.get("birthdate_to")}
-        result = CustomerController().get_list(limit, (page - 1) * limit, filters)
-        return JSONResponse(content=jsonable_encoder({"data": result["customers_list_dto"], "limit": limit,
-                                                       "page": page, "is_last_page": result["is_last_page"]}),
-                            status_code=http_status.HTTP_200_OK)
+    def on_get_list(self, request: Request, db=Depends(get_db)) -> JSONResponse:
+        result = CustomerController(db).list_from_query(request.query_params)
+        return JSONResponse(content=jsonable_encoder(result), status_code=http_status.HTTP_200_OK)

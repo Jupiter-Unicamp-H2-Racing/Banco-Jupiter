@@ -3,6 +3,8 @@ from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
+from alembic import command
+from alembic.config import Config
 
 
 RESET_QUERIES = [
@@ -13,7 +15,7 @@ RESET_QUERIES = [
 ]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_FILE = PROJECT_ROOT / "database" / "database.sql"
+ALEMBIC_CONFIG = PROJECT_ROOT / "alembic.ini"
 
 DEFAULT_DATABASE_URL = "postgresql+psycopg2://bootcamp:bootcamp@localhost:5432/bootcamp"
 
@@ -25,30 +27,7 @@ DATABASE_OFFLINE = (
 
 
 class DbUtils:
-    """Apaga o banco inteiro e o recria do zero — quando alguém chama.
-
-    Não existe limpeza automática neste projeto. O `rollback()` roda no
-    teste que o chamar, na linha em que for chamado, e em mais lugar
-    nenhum. Todos os testes dividem o mesmo banco, e cada um enxerga o
-    que os anteriores deixaram pra trás.
-
-    O nome engana um pouco: isto não desfaz uma transação. Ele derruba
-    o schema `public` com tudo que estiver dentro e roda o
-    `database/database.sql` de novo — tabelas vazias e os quatro status
-    do INSERT de volta.
-
-    Quando o seu teste precisa chamar: sempre que alguma asserção
-    depender de QUANTAS linhas existem no banco — contar, listar,
-    paginar, filtrar. Nesses casos `DbUtils.rollback()` é a primeira
-    linha do teste, antes de criar qualquer coisa (o exemplo está em
-    `tests/integration/test_customers.py`). Um teste que só olha
-    as entidades que ele mesmo criou, pela chave que recebeu de volta,
-    não precisa de limpeza nenhuma — e fica mais rápido sem ela.
-
-    A limpeza acontece pela mesma conexão que a aplicação usa (a
-    DATABASE_URL), e não por um programa externo: quem tem Docker
-    rodando já tem tudo que precisa.
-    """
+    """Recria o schema de teste usando a revisão atual do Alembic."""
 
     @staticmethod
     def database_url() -> str:
@@ -63,7 +42,9 @@ class DbUtils:
                 for query in RESET_QUERIES:
                     connection.exec_driver_sql(query)
 
-                connection.exec_driver_sql(SCHEMA_FILE.read_text())
+            config = Config(str(ALEMBIC_CONFIG))
+            config.set_main_option("sqlalchemy.url", DbUtils.database_url().replace("%", "%%"))
+            command.upgrade(config, "head")
         except OperationalError:
             message = DATABASE_OFFLINE.format(host=engine.url.host, port=engine.url.port)
             raise RuntimeError(message) from None

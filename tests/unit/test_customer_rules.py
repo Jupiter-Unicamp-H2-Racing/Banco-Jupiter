@@ -13,11 +13,11 @@ def test_customer_age_boundaries_are_explicit():
 
 
 def test_customer_statuses_match_database_seed_values():
-    sql = (Path(__file__).resolve().parents[2] / "database" / "database.sql").read_text(encoding="utf-8")
+    migration = (Path(__file__).resolve().parents[2] / "migrations" / "versions" / "0001_initial_schema.py").read_text(encoding="utf-8")
     expected = {"pending_kyc", "active", "blocked", "inactive"}
     assert set(CustomerStatus.ALLOWED) == expected
     for status in expected:
-        assert f"('{status}')" in sql
+        assert f'"{status}"' in migration
 
 
 def test_all_json_schemas_parse():

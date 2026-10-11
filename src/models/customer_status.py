@@ -1,5 +1,4 @@
 from sqlalchemy import Column, DateTime, Integer, String, func
-from sqlalchemy.orm import relationship
 from models.base import Base
 
 
@@ -15,4 +14,3 @@ class CustomerStatus(Base):
     id = Column(Integer, primary_key=True)
     enumerator = Column(String(50), nullable=False, unique=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    customers = relationship("Customer", back_populates="status", lazy="selectin")

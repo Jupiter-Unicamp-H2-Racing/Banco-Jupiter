@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, func
 from sqlalchemy.orm import relationship
 from models.base import Base
 
@@ -13,3 +13,5 @@ class CustomerStatusEvent(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     customer = relationship("Customer", back_populates="status_events", foreign_keys=[customer_id])
     status = relationship("CustomerStatus", foreign_keys=[status_id], lazy="selectin")
+
+    __table_args__ = (Index("ix_customer_status_event_customer_id", "customer_id"),)

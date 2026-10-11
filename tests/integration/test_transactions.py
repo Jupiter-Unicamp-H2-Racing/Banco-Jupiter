@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import create_engine, text
 
 from tests.utils.object_generator import ObjectGenerator
 from tests.utils.request_generator import RequestGenerator
@@ -18,6 +19,29 @@ def _transfer(source, destination, amount):
     return RequestGenerator.POST_transaction(
         source, {"destination_account_key": destination, "amount": amount})
 
+
+
+def _set_account_customer_status(account_key, status_name):
+    """Altera o status diretamente para cobrir estados finais no fluxo financeiro."""
+    from tests.utils.db_utils import DbUtils
+
+    engine = create_engine(DbUtils.database_url())
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("""
+                    UPDATE customer
+                    SET status_id = (
+                        SELECT id FROM customer_status WHERE enumerator = :status
+                    )
+                    WHERE id = (
+                        SELECT customer_id FROM account WHERE account_key = :account_key
+                    )
+                """),
+                {"status": status_name, "account_key": account_key},
+            )
+    finally:
+        engine.dispose()
 
 def _balance(account_key):
     return RequestGenerator.GET_account(account_key)[1]["balance"]
@@ -43,6 +67,29 @@ def test_fee_starts_after_the_free_allowance_and_is_paid_by_the_source_only():
     assert (body["fee_amount"], body["is_fee_exempt"]) == (FEE, False)
     assert _balance(source) == 10_000 - 6 * 100 - FEE
     assert _balance(destination) == 6 * 100
+
+
+def test_charged_fee_is_credited_to_system_revenue_account_and_statement():
+    fee_account_key = "00000000-0000-4000-8000-000000000001"
+    before = _balance(fee_account_key)
+    source = ObjectGenerator.create_account(balance=10_000)
+    destination = ObjectGenerator.create_account()
+
+    initial_total = _balance(source) + _balance(destination) + before
+    fees_charged = 0
+    for index in range(8):
+        status, body = _transfer(source, destination, 100)
+        assert status == 201
+        fees_charged += body["fee_amount"]
+
+    assert fees_charged == 3 * FEE
+    assert _balance(fee_account_key) == before + fees_charged
+    assert _balance(source) + _balance(destination) + _balance(fee_account_key) == initial_total
+    statement_status, statement = RequestGenerator.GET_transactions(fee_account_key)
+    assert statement_status == 200
+    assert statement["items"][0]["direction"] == "credit"
+    assert statement["items"][0]["amount"] == FEE
+    assert statement["items"][0]["fee_amount"] == 0
 
 
 def test_high_balance_source_never_pays_fee():
@@ -72,6 +119,26 @@ def test_amount_that_fits_but_not_with_the_fee_is_rejected():
     assert _balance(source) == remaining
     assert _transfer(source, destination, remaining - FEE)[0] == 201
     assert _balance(source) == 0
+
+
+def test_fee_revenue_account_cannot_be_source_or_destination_of_ordinary_transfer():
+    fee_account_key = "00000000-0000-4000-8000-000000000001"
+    source = ObjectGenerator.create_account(balance=10_000)
+    destination = ObjectGenerator.create_account(balance=100)
+    source_before = _balance(source)
+    destination_before = _balance(destination)
+    fee_before = _balance(fee_account_key)
+
+    status, body = _transfer(source, fee_account_key, 100)
+    assert (status, body["code"]) == (422, "QIT002003")
+    status, body = _transfer(fee_account_key, destination, 100)
+    assert (status, body["code"]) == (422, "QIT002003")
+
+    assert _balance(source) == source_before
+    assert _balance(destination) == destination_before
+    assert _balance(fee_account_key) == fee_before
+    assert RequestGenerator.GET_transactions(source)[1]["pagination"]["total_items"] == 0
+    assert RequestGenerator.GET_transactions(destination)[1]["pagination"]["total_items"] == 0
 
 
 def test_transfer_to_the_same_account_and_unknown_accounts_are_rejected():
@@ -172,3 +239,25 @@ def test_amount_above_bigint_is_rejected_by_schema():
     source = ObjectGenerator.create_account(balance=1000)
     destination = ObjectGenerator.create_account()
     assert _transfer(source, destination, 10**20)[0] == 400
+
+
+@pytest.mark.parametrize(("side", "customer_status", "error_code"), [
+    ("source", "blocked", "QIT002008"),
+    ("source", "inactive", "QIT002008"),
+    ("destination", "blocked", "QIT002009"),
+    ("destination", "pending_kyc", "QIT002009"),
+])
+def test_transfer_rejects_non_active_customers_without_moving_money(
+    side, customer_status, error_code
+):
+    source = ObjectGenerator.create_account(balance=10_000)
+    destination = ObjectGenerator.create_account(balance=2_000)
+    target = source if side == "source" else destination
+    _set_account_customer_status(target, customer_status)
+
+    status, body = _transfer(source, destination, 1_000)
+
+    assert (status, body["code"]) == (422, error_code)
+    assert (_balance(source), _balance(destination)) == (10_000, 2_000)
+    assert RequestGenerator.GET_transactions(source)[1]["pagination"]["total_items"] == 0
+    assert RequestGenerator.GET_transactions(destination)[1]["pagination"]["total_items"] == 0

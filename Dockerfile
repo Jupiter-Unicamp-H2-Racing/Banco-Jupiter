@@ -30,11 +30,19 @@ RUN pip install -r /requirements-dev.txt
 # Copia os testes para dentro do container
 COPY tests /tests
 
+# Migrations do Alembic (os testes recriam o schema com elas).
+# Com PYTHONPATH=/app:/ e raiz do projeto = "/", o alembic.ini fica em /.
+COPY alembic.ini /alembic.ini
+COPY migrations /migrations
+
+# Alguns testes leem /src/schemas (raiz do projeto = "/"): o codigo vive em /app.
+RUN ln -s /app /src
+
 # Configura o diretorio de trabalho dos testes
 ENV PYTHONPATH=/app:/
 
 # Permite que o usuario da aplicacao acesse os arquivos
-RUN chown -R user /app /tests
+RUN chown -R user /app /tests /migrations /alembic.ini
 
 ENV COVERAGE_FILE=/tmp/.coverage
 
@@ -43,4 +51,4 @@ COPY database /database
 # Executa a aplicacao sem privilegios de root
 USER user
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "3000", "--no-server-header"]
+CMD ["sh", "-c", "alembic -c /alembic.ini upgrade head && uvicorn app:app --host 0.0.0.0 --port 3000 --no-server-header"]

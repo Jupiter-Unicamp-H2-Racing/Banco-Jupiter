@@ -1,3 +1,4 @@
+from sqlalchemy.orm import Session
 from uuid import uuid4
 
 from controllers.base_controller import BaseController
@@ -9,10 +10,10 @@ from repositories.customer_repository import CustomerRepository
 
 
 class AccountController(BaseController):
-    def __init__(self) -> None:
-        super().__init__(__name__)
-        self.account_repository = AccountRepository(self.context)
-        self.customer_repository = CustomerRepository(self.context)
+    def __init__(self, session: Session) -> None:
+        super().__init__(session, __name__)
+        self.account_repository = AccountRepository(session)
+        self.customer_repository = CustomerRepository(session)
 
     def create(self, payload: dict) -> dict:
         payload = {**payload, "customer_key": payload["customer_key"].lower()}
@@ -22,7 +23,7 @@ class AccountController(BaseController):
         if customer.status.enumerator != CustomerStatus.ACTIVE:
             raise CustomerNotActive(customer.customer_key, customer.status.enumerator)
         account = self.account_repository.create(
-            customer.id, payload.get("initial_balance", 0), str(uuid4())
+            customer.id, 0, str(uuid4())
         )
         self.session.commit()
         return AccountDTO.only_obj_key(account)

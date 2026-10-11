@@ -2,7 +2,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from controllers import base_controller
 
 
 class FakeSession:
@@ -18,9 +17,6 @@ class FakeSession:
 
 
 @pytest.fixture
-def fake_session(monkeypatch):
-    """Troca o contexto de banco por um falso: controllers rodam sem Postgres."""
-    session = FakeSession()
-    context = SimpleNamespace(db_session=session, get_or_create_session=lambda: session)
-    monkeypatch.setattr(base_controller, "get_context", lambda: context)
-    return session
+def fake_session():
+    """Fornece uma sessão falsa aos controllers sem PostgreSQL."""
+    return FakeSession()

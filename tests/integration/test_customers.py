@@ -99,7 +99,7 @@ def test_get_customer_404_for_unknown_key():
 def test_update_status_from_pending_kyc_is_accepted_and_recorded_in_history():
     customer_key = ObjectGenerator.create_customer()
     status, body = RequestGenerator.PUT_customer(customer_key, {"status": "active"})
-    assert (status, body) == (202, {"customer_key": customer_key})
+    assert (status, body) == (200, {"customer_key": customer_key})
     _, customer = RequestGenerator.GET_customer(customer_key)
     assert customer["status"] == "active"
     assert [event["status"] for event in customer["status_events"]] == ["pending_kyc", "active"]
@@ -181,7 +181,7 @@ def test_parallel_status_updates_only_allow_one_transition():
 
     with ThreadPoolExecutor(max_workers=count) as pool:
         statuses = list(pool.map(update, ["active", "blocked"] * (count // 2)))
-    assert statuses.count(202) == 1
+    assert statuses.count(200) == 1
     assert statuses.count(409) == count - 1
     customer = RequestGenerator.GET_customer(key)[1]
     assert len(customer["status_events"]) == 2

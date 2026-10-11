@@ -13,10 +13,11 @@ class TransactionDTO:
         items = []
         for transaction, counterparty_key in rows:
             is_debit = transaction.source_account_id == account_id
+            is_fee_credit = getattr(transaction, "fee_account_id", None) == account_id
             items.append({
                 "transaction_key": transaction.transaction_key.strip(),
                 "direction": "debit" if is_debit else "credit",
-                "amount": transaction.amount,
+                "amount": transaction.fee_amount if is_fee_credit else transaction.amount,
                 "fee_amount": transaction.fee_amount if is_debit else 0,
                 "counterparty_account_key": counterparty_key.strip(),
                 "created_at": transaction.created_at.isoformat(),

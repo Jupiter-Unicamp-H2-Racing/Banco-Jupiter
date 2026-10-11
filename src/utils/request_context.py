@@ -52,9 +52,14 @@ def get_request_id() -> str:
     return _request_id.get()
 
 
-def set_request_id(request_id: str) -> None:
-    """Guarda o identificador desta requisição. Quem chama é o middleware."""
-    _request_id.set(request_id)
+def set_request_id(request_id: str):
+    """Guarda o identificador desta requisição e devolve o token de restauração."""
+    return _request_id.set(request_id)
+
+
+def reset_request_id(token) -> None:
+    """Restaura o contexto anterior ao fim da requisição."""
+    _request_id.reset(token)
 
 
 def build_request_id(received_request_id: str = None) -> str:

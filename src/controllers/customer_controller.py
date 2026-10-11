@@ -1,3 +1,4 @@
+from sqlalchemy.orm import Session
 from datetime import date
 from sqlalchemy.exc import IntegrityError
 from controllers.base_controller import BaseController
@@ -5,6 +6,7 @@ from dtos import CustomerDTO
 from errors import InvalidParameter
 from errors.custom_errors import DuplicatedDocumentNumber, DuplicatedEmail, InvalidBirthdate, InvalidDocumentNumber, NotFoundCustomer, CustomerFinalStatus, UnderageCustomer, OverAgeCustomer
 from models.customer_status import CustomerStatus
+from constants import DEFAULT_LIMIT, DEFAULT_PAGE, MAX_LIMIT
 from repositories.customer_repository import CustomerRepository
 from utils.document_number import is_valid_cpf
 
@@ -13,9 +15,9 @@ MAXIMUM_AGE = 80
 
 
 class CustomerController(BaseController):
-    def __init__(self) -> None:
-        super().__init__(__name__)
-        self.customer_repository = CustomerRepository(self.context)
+    def __init__(self, session: Session) -> None:
+        super().__init__(session, __name__)
+        self.customer_repository = CustomerRepository(session)
 
     def create(self, customer_data: dict) -> dict:
         document_number = customer_data["document_number"]
@@ -41,7 +43,7 @@ class CustomerController(BaseController):
             constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
             if constraint in {"customer_document_number_key", "uq_customer_document_number"}:
                 raise DuplicatedDocumentNumber(document_number) from exc
-            if constraint in {"customer_email_key", "uq_customer_email_lower", "uq_customer_email"}:
+            if constraint == "uq_customer_email_lower":
                 raise DuplicatedEmail(email) from exc
             raise
         return CustomerDTO.only_obj_key(customer)
@@ -52,6 +54,27 @@ class CustomerController(BaseController):
         if customer is None:
             raise NotFoundCustomer(customer_key)
         return CustomerDTO.obj_to_dict(customer)
+
+    def list_from_query(self, params) -> dict:
+        limit = int(params.get("limit", DEFAULT_LIMIT))
+        page = int(params.get("page", DEFAULT_PAGE))
+        if limit < 1 or limit > MAX_LIMIT or page < 1:
+            raise InvalidParameter("limit or page is outside the allowed range")
+        filters = {
+            "status_enumerators": params.getlist("status"),
+            "name": params.get("name"),
+            "email": params.get("email"),
+            "document_number": params.get("document_number"),
+            "birthdate_from": params.get("birthdate_from"),
+            "birthdate_to": params.get("birthdate_to"),
+        }
+        result = self.get_list(limit, (page - 1) * limit, filters)
+        return {
+            "data": result["customers_list_dto"],
+            "limit": limit,
+            "page": page,
+            "is_last_page": result["is_last_page"],
+        }
 
     def get_list(self, limit: int, offset: int, filters: dict) -> dict:
         for key in ("birthdate_from", "birthdate_to"):

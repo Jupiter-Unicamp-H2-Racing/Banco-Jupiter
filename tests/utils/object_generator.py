@@ -16,7 +16,7 @@ class ObjectGenerator:
         status, body = RequestGenerator.PUT_customer(
             customer_key, PayloadGenerator.create_new_status_payload(new_status)
         )
-        assert status == 202, body
+        assert status == 200, body
         return body
 
     @staticmethod
@@ -29,6 +29,20 @@ class ObjectGenerator:
     def create_account(customer_key: str = None, balance: int = 0) -> str:
         if customer_key is None:
             customer_key = ObjectGenerator.create_active_customer()
-        status, body = RequestGenerator.POST_account({"customer_key": customer_key, "initial_balance": balance})
+        status, body = RequestGenerator.POST_account({"customer_key": customer_key})
         assert status == 201, body
-        return body["account_key"]
+        account_key = body["account_key"]
+        if balance:
+            from sqlalchemy import create_engine, text
+            from tests.utils.db_utils import DbUtils
+
+            engine = create_engine(DbUtils.database_url())
+            try:
+                with engine.begin() as connection:
+                    connection.execute(
+                        text("UPDATE account SET balance = :balance WHERE account_key = :key"),
+                        {"balance": balance, "key": account_key},
+                    )
+            finally:
+                engine.dispose()
+        return account_key

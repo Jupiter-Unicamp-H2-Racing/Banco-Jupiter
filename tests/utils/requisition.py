@@ -2,6 +2,9 @@ import json
 from requests import request, Response
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from os import environ
+from pathlib import Path
+
+from dotenv import dotenv_values
 
 
 API_OFFLINE = (
@@ -26,8 +29,10 @@ class ClientRequisition:
         if headers is None:
             headers = dict()
 
-        api_host = environ.get("SERVER_LOCALHOST", "0.0.0.0")
-        api_port = environ.get("API_PORT", "3000")
+        api_host = environ.get("SERVER_LOCALHOST", "127.0.0.1")
+        project_root = Path(__file__).resolve().parents[2]
+        project_env = dotenv_values(project_root / ".env")
+        api_port = environ.get("BANK_JUPITER_API_PORT") or project_env.get("API_PORT") or "3000"
         base_url = f"http://{api_host}:{api_port}"
 
         url = f"{base_url}{endpoint}"

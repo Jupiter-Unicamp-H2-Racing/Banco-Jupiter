@@ -41,15 +41,15 @@ class FakeCustomerRepo:
     def update_status(self, customer, new_status): self.new_status = new_status
 
 
-def _customer_controller(repo):
-    controller = CustomerController()
+def _customer_controller(repo, session):
+    controller = CustomerController(session)
     controller.customer_repository = repo
     return controller
 
 
 def test_customer_create_commits_once_after_all_checks(fake_session):
     repo = FakeCustomerRepo()
-    assert _customer_controller(repo).create(dict(VALID)) == {"customer_key": "k"}
+    assert _customer_controller(repo, fake_session).create(dict(VALID)) == {"customer_key": "k"}
     assert fake_session.commits == 1
 
 
@@ -61,15 +61,15 @@ def test_customer_create_commits_once_after_all_checks(fake_session):
 def test_customer_create_rejections_never_commit(fake_session, override, error):
     repo = FakeCustomerRepo()
     with pytest.raises(error):
-        _customer_controller(repo).create({**VALID, **override})
+        _customer_controller(repo, fake_session).create({**VALID, **override})
     assert fake_session.commits == 0 and repo.created is None
 
 
 def test_customer_create_rejects_duplicates(fake_session):
     with pytest.raises(DuplicatedDocumentNumber):
-        _customer_controller(FakeCustomerRepo(by_doc=object())).create(dict(VALID))
+        _customer_controller(FakeCustomerRepo(by_doc=object()), fake_session).create(dict(VALID))
     with pytest.raises(DuplicatedEmail):
-        _customer_controller(FakeCustomerRepo(by_email=object())).create(dict(VALID))
+        _customer_controller(FakeCustomerRepo(by_email=object()), fake_session).create(dict(VALID))
     assert fake_session.commits == 0
 
 
@@ -77,21 +77,21 @@ def test_customer_update_status_rules(fake_session):
     pending = SimpleNamespace(status=SimpleNamespace(enumerator="pending_kyc"), customer_key="k", name="n",
                               email="e", document_number="d", birthdate=date(1990, 1, 1), status_events=[])
     repo = FakeCustomerRepo(existing=pending)
-    _customer_controller(repo).update_status("k", "active")
+    _customer_controller(repo, fake_session).update_status("k", "active")
     assert repo.new_status == "active" and fake_session.commits == 1
 
     with pytest.raises(InvalidParameter):
-        _customer_controller(repo).update_status("k", "pending_kyc")
+        _customer_controller(repo, fake_session).update_status("k", "pending_kyc")
     with pytest.raises(NotFoundCustomer):
-        _customer_controller(FakeCustomerRepo()).update_status("k", "active")
+        _customer_controller(FakeCustomerRepo(), fake_session).update_status("k", "active")
     final = SimpleNamespace(status=SimpleNamespace(enumerator="active"))
     with pytest.raises(CustomerFinalStatus):
-        _customer_controller(FakeCustomerRepo(existing=final)).update_status("k", "blocked")
+        _customer_controller(FakeCustomerRepo(existing=final), fake_session).update_status("k", "blocked")
 
 
 def test_customer_list_birthdate_range_is_validated(fake_session):
     with pytest.raises(InvalidParameter):
-        _customer_controller(FakeCustomerRepo()).get_list(
+        _customer_controller(FakeCustomerRepo(), fake_session).get_list(
             10, 0, {"birthdate_from": "2000-01-01", "birthdate_to": "1990-01-01"})
 
 
@@ -111,8 +111,8 @@ class FakeAccountRepo:
     def update_balance(self, account, new_balance): account.balance = new_balance
 
 
-def _account_controller(customer, accounts=None):
-    controller = AccountController()
+def _account_controller(customer, session, accounts=None):
+    controller = AccountController(session)
     controller.customer_repository = SimpleNamespace(get_by_key=lambda _: customer)
     controller.account_repository = FakeAccountRepo(accounts)
     return controller
@@ -120,23 +120,23 @@ def _account_controller(customer, accounts=None):
 
 def test_account_create_requires_existing_active_customer(fake_session):
     with pytest.raises(NotFoundCustomer):
-        _account_controller(None).create({"customer_key": "k"})
+        _account_controller(None, fake_session).create({"customer_key": "k"})
     pending = SimpleNamespace(id=1, customer_key="k", status=SimpleNamespace(enumerator="pending_kyc"))
     with pytest.raises(CustomerNotActive):
-        _account_controller(pending).create({"customer_key": "k"})
+        _account_controller(pending, fake_session).create({"customer_key": "k"})
     assert fake_session.commits == 0
 
     active = SimpleNamespace(id=1, customer_key="k", status=SimpleNamespace(enumerator="active"))
-    controller = _account_controller(active)
+    controller = _account_controller(active, fake_session)
     result = controller.create({"customer_key": "k", "initial_balance": 500})
-    assert controller.account_repository.created[:2] == (1, 500)
+    assert controller.account_repository.created[:2] == (1, 0)
     assert result == {"account_key": controller.account_repository.created[2]}
     assert fake_session.commits == 1
 
 
 def test_account_get_unknown_raises(fake_session):
     with pytest.raises(AccountNotFound):
-        _account_controller(None).get_by_key("nope")
+        _account_controller(None, fake_session).get_by_key("nope")
 
 
 class FakeTransactionRepo:
@@ -150,29 +150,41 @@ class FakeTransactionRepo:
         return transaction
 
 
-def _transaction_controller(source, destination, monthly_count=0):
-    controller = TransactionController()
-    controller.account_repository = FakeAccountRepo({"src": source, "dst": destination})
+def _transaction_controller(source, destination, session, monthly_count=0):
+    controller = TransactionController(session)
+    fee_account = _account(3, 0)
+    controller.account_repository = FakeAccountRepo({
+        "src": source, "dst": destination,
+        "00000000-0000-4000-8000-000000000001": fee_account,
+    })
     controller.transaction_repository = FakeTransactionRepo(monthly_count)
     return controller
 
 
 def _account(id_, balance, limit=5):
-    return SimpleNamespace(id=id_, balance=balance, monthly_free_transfers_limit=limit)
+    customer = SimpleNamespace(
+        customer_key=f"customer-{id_}",
+        status=SimpleNamespace(enumerator="active"),
+    )
+    return SimpleNamespace(
+        id=id_, balance=balance, monthly_free_transfers_limit=limit,
+        customer=customer,
+    )
 
 
 def test_transfer_debits_amount_plus_fee_and_credits_only_the_amount(fake_session):
     source, destination = _account(1, 10_000), _account(2, 0)
-    controller = _transaction_controller(source, destination, monthly_count=5)
+    controller = _transaction_controller(source, destination, fake_session, monthly_count=5)
     result = controller.create("src", {"destination_account_key": "dst", "amount": 1_000})
-    assert (source.balance, destination.balance) == (10_000 - 1_000 - 50, 1_000)
+    fee_account = controller.account_repository.accounts["00000000-0000-4000-8000-000000000001"]
+    assert (source.balance, destination.balance, fee_account.balance) == (10_000 - 1_000 - 50, 1_000, 50)
     assert (result["fee_amount"], result["is_fee_exempt"]) == (50, False)
     assert fake_session.commits == 1 and fake_session.rollbacks == 0
 
 
 def test_transfer_inside_free_allowance_has_no_fee(fake_session):
     source, destination = _account(1, 10_000), _account(2, 0)
-    result = _transaction_controller(source, destination, monthly_count=4).create(
+    result = _transaction_controller(source, destination, fake_session, monthly_count=4).create(
         "src", {"destination_account_key": "dst", "amount": 1_000})
     assert result["fee_amount"] == 0 and source.balance == 9_000
 
@@ -180,19 +192,19 @@ def test_transfer_inside_free_allowance_has_no_fee(fake_session):
 def test_transfer_failures_roll_back_and_leave_balances_untouched(fake_session):
     source, destination = _account(1, 100), _account(2, 0)
     with pytest.raises(InsufficientBalance):
-        _transaction_controller(source, destination).create("src", {"destination_account_key": "dst", "amount": 101})
+        _transaction_controller(source, destination, fake_session).create("src", {"destination_account_key": "dst", "amount": 101})
     with pytest.raises(InvalidTransfer):
-        _transaction_controller(source, source).create("src", {"destination_account_key": "dst", "amount": 1})
+        _transaction_controller(source, source, fake_session).create("src", {"destination_account_key": "dst", "amount": 1})
     with pytest.raises(AccountNotFound):
-        _transaction_controller(source, None).create("src", {"destination_account_key": "dst", "amount": 1})
+        _transaction_controller(source, None, fake_session).create("src", {"destination_account_key": "dst", "amount": 1})
     with pytest.raises(AccountNotFound):
-        _transaction_controller(None, destination).create("src", {"destination_account_key": "dst", "amount": 1})
+        _transaction_controller(None, destination, fake_session).create("src", {"destination_account_key": "dst", "amount": 1})
     assert (source.balance, destination.balance) == (100, 0)
     assert fake_session.commits == 0 and fake_session.rollbacks == 4
 
 
 def test_statement_date_validation(fake_session):
-    controller = TransactionController()
+    controller = TransactionController(fake_session)
     controller.account_repository = FakeAccountRepo({"a": _account(1, 0)})
     with pytest.raises(InvalidStatementDate):
         controller.list("a", start_date="2025-02-30")
@@ -200,3 +212,30 @@ def test_statement_date_validation(fake_session):
         controller.list("a", start_date="2026-02-02", end_date="2026-02-01")
     with pytest.raises(AccountNotFound):
         controller.list("missing")
+
+
+@pytest.mark.parametrize("side,status,error_name", [
+    ("source", "blocked", "SourceCustomerNotActive"),
+    ("source", "inactive", "SourceCustomerNotActive"),
+    ("destination", "blocked", "DestinationCustomerNotActive"),
+    ("destination", "pending_kyc", "DestinationCustomerNotActive"),
+])
+def test_transfer_rejects_non_active_customer_without_mutation(fake_session, side, status, error_name):
+    import errors.custom_errors as custom_errors
+
+    source = _account(1, 10_000)
+    destination = _account(2, 2_000)
+    source.customer = SimpleNamespace(status=SimpleNamespace(enumerator="active"), customer_key="src-customer")
+    destination.customer = SimpleNamespace(status=SimpleNamespace(enumerator="active"), customer_key="dst-customer")
+    target = source if side == "source" else destination
+    target.customer.status.enumerator = status
+
+    controller = _transaction_controller(source, destination, fake_session)
+    error = getattr(custom_errors, error_name)
+    with pytest.raises(error):
+        controller.create("src", {"destination_account_key": "dst", "amount": 1_000})
+
+    assert (source.balance, destination.balance) == (10_000, 2_000)
+    assert controller.transaction_repository.created == []
+    assert fake_session.commits == 0
+    assert fake_session.rollbacks == 1

@@ -1,47 +1,44 @@
-from fastapi import FastAPI, Request
+from errors.base_error import InternalError
+from errors.handlers import qi_exception_to_response
+from utils.request_context import REQUEST_ID_HEADER, build_request_id, reset_request_id, set_request_id
 
-from utils.request_context import REQUEST_ID_HEADER, build_request_id, set_request_id
+
+class RequestContextMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        headers = {key.lower(): value.decode("latin-1") for key, value in scope.get("headers", [])}
+        request_id = build_request_id(headers.get(REQUEST_ID_HEADER.lower()))
+        request_context_token = set_request_id(request_id)
+        response_started = False
+
+        async def send_with_request_id(message):
+            nonlocal response_started
+            if message["type"] == "http.response.start":
+                response_started = True
+                response_headers = list(message.get("headers", []))
+                response_headers = [
+                    (key, value) for key, value in response_headers
+                    if key.lower() != REQUEST_ID_HEADER.lower().encode("ascii")
+                ]
+                response_headers.append((REQUEST_ID_HEADER.lower().encode("ascii"), request_id.encode("ascii")))
+                message["headers"] = response_headers
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_with_request_id)
+        except Exception:
+            if response_started:
+                raise
+            response = qi_exception_to_response(InternalError())
+            await response(scope, receive, send_with_request_id)
+        finally:
+            reset_request_id(request_context_token)
 
 
-def register_request_context_middleware(application: FastAPI) -> None:
-    """Dá um nome próprio a cada requisição, do primeiro byte ao último.
-
-    Este é o middleware mais curto do projeto e o que mais economiza
-    tempo no dia ruim. Pense na cena: alguém diz "deu erro por volta das
-    14h30". Você abre o log e encontra mil linhas parecidas, de mil
-    requisições diferentes, embaralhadas — porque a API atende várias ao
-    mesmo tempo, e o log é um só.
-
-    Com o identificador, toda linha nascida da MESMA requisição carrega
-    o MESMO nome. Achar uma agulha vira um comando:
-
-        docker compose logs api | grep 8f3c1e42
-
-    Três decisões deste arquivo valem a leitura:
-
-    • **Ele não pula rota nenhuma.** Os outros middlewares deixam passar
-      as rotas de BYPASS_ENDPOINTS; este não tem exceção, porque não
-      existe requisição que não mereça um nome — inclusive a que deu
-      errado logo na porta.
-
-    • **O identificador volta no cabeçalho da resposta.** Quem chamou
-      recebe o número de protocolo e pode citá-lo ao abrir um chamado:
-      "deu erro, e o id era este". Sem isso, ele teria o problema e você
-      teria o log, e ninguém conseguiria juntar os dois.
-
-    • **Ele guarda o valor num ContextVar** (em src/utils/request_context.py)
-      em vez de passar o identificador de parâmetro em parâmetro por
-      todas as camadas até o repository. O logger lê de lá sozinho, e
-      nenhuma função do projeto precisou ganhar um argumento a mais.
-    """
-
-    @application.middleware("http")
-    async def create_request_context(request: Request, call_next):
-        request_id = build_request_id(request.headers.get(REQUEST_ID_HEADER))
-        set_request_id(request_id)
-
-        response = await call_next(request)
-
-        response.headers[REQUEST_ID_HEADER] = request_id
-
-        return response
+def register_request_context_middleware(application) -> None:
+    application.add_middleware(RequestContextMiddleware)

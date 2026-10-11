@@ -46,7 +46,18 @@ git clone <url-do-repositorio>
 cd bootcamp-base-api
 ```
 
-### 2. Iniciar a aplicação
+### 2. Configurar o ambiente
+
+Antes de iniciar, configure um token interno. Gere um token aleatório e guarde-o em local seguro:
+
+```bash
+cp .env.example .env
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Copie o token gerado para `INTERNAL_TOKEN` no arquivo `.env`. O arquivo `.env` não deve ser versionado. O Compose falha explicitamente se `INTERNAL_TOKEN` não estiver configurado.
+
+### 3. Iniciar a aplicação
 
 ```bash
 sudo docker compose up -d --build
@@ -54,7 +65,7 @@ sudo docker compose up -d --build
 
 Esse comando constrói as imagens necessárias e inicia a API e o banco de dados em segundo plano.
 
-### 3. Verificar os serviços
+### 4. Verificar os serviços
 
 ```bash
 sudo docker compose ps
@@ -62,7 +73,7 @@ sudo docker compose ps
 
 A API fica disponível na porta `3000`, e o PostgreSQL utiliza a porta `5432` por padrão.
 
-### 4. Verificar se a API está funcionando
+### 5. Verificar se a API está funcionando
 
 ```bash
 curl -i http://localhost:3000/health_check
@@ -131,13 +142,9 @@ sudo docker compose exec api python -m pytest /tests --cov=/app --cov-report=ter
 
 ## Autenticação
 
-Todas as rotas, exceto `GET /` e `GET /health_check`, exigem o seguinte cabeçalho HTTP:
+Todas as rotas, exceto `GET /` e `GET /health_check`, exigem o cabeçalho HTTP `INTERNAL-TOKEN`, cujo valor deve corresponder à variável de ambiente `INTERNAL_TOKEN` configurada na API. Não existe token padrão no Docker Compose: a inicialização falha se a variável não estiver definida.
 
-```http
-INTERNAL-TOKEN: default_token
-```
-
-O valor padrão é destinado ao desenvolvimento. Em outros ambientes, configure um token próprio por meio da variável de ambiente `INTERNAL_TOKEN`.
+Gere um valor aleatório para cada ambiente. Em produção, não utilize os valores de exemplo do `.env.example`. O token interno autentica o chamador como serviço autorizado; ele **não** identifica individualmente um cliente e, portanto, não constitui autorização por cliente. Essa API continua adequada apenas a um contexto interno controlado enquanto não houver identidade e autorização por cliente.
 
 ## Principais rotas
 
@@ -184,3 +191,12 @@ Antes de entregar:
 4. Verifique se o README apresenta instruções suficientes para executar a aplicação e os testes.
 
 O arquivo `.env.example` pode ser versionado desde que contenha apenas valores de exemplo, sem credenciais reais.
+
+
+## Contrato HTTP e limitações de segurança
+
+A atualização de status em `PUT /customers/{customer_key}` é síncrona e retorna `200 OK` com a representação do cliente. Erros de validação usam os códigos de erro documentados nos testes e nas classes de `src/errors/`.
+
+A documentação interativa OpenAPI/Swagger/ReDoc permanece desabilitada na aplicação. Consulte a tabela de rotas e os schemas JSON em `src/schemas/` para os formatos de entrada; respostas e erros são definidos pelas resources, DTOs e handlers de erro.
+
+O token interno é uma barreira entre serviços, não um login de cliente. Atualmente não há identidade individual de cliente nem autorização que vincule o chamador a uma conta específica. Não exponha esta API diretamente à internet como se fosse um sistema bancário de uso final.

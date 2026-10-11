@@ -1,32 +1,34 @@
 import hmac
 
-from fastapi import FastAPI, Request
+from starlette.responses import JSONResponse
 
 from constants import BYPASS_ENDPOINTS, INTERNAL_TOKEN
 from errors.base_error import ForbiddenNotInternal
 from errors.handlers import qi_exception_to_response
 
 
-def register_internal_token_middleware(application: FastAPI) -> None:
-    """Deixa passar só quem manda o header INTERNAL-TOKEN com o valor certo.
+class InternalTokenMiddleware:
+    def __init__(self, app):
+        self.app = app
 
-    O valor certo vem da variável de ambiente INTERNAL_TOKEN, nunca do
-    código. As rotas de BYPASS_ENDPOINTS (raiz e health check) são públicas.
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        method = scope.get("method", "GET")
+        headers = {key.lower(): value for key, value in scope.get("headers", [])}
+        if method == "OPTIONS" or path in BYPASS_ENDPOINTS:
+            await self.app(scope, receive, send)
+            return
+        supplied = headers.get(b"internal-token", b"")
+        expected = (INTERNAL_TOKEN or "").encode("utf-8")
+        if not hmac.compare_digest(supplied, expected):
+            response = qi_exception_to_response(ForbiddenNotInternal())
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
 
-    Repare que aqui a gente DEVOLVE a resposta de erro em vez de levantar
-    a exceção: dentro de um middleware, ninguém está escutando pra traduzir
-    o erro — quem traduz são os exception handlers, que rodam mais pra
-    dentro. Levantar aqui viraria um 500.
-    """
 
-    @application.middleware("http")
-    async def check_internal_token(request: Request, call_next):
-        is_public = request.url.path in BYPASS_ENDPOINTS
-
-        if request.method == "OPTIONS" or is_public:
-            return await call_next(request)
-
-        if not hmac.compare_digest(request.headers.get("INTERNAL-TOKEN", ""), INTERNAL_TOKEN):
-            return qi_exception_to_response(ForbiddenNotInternal())
-
-        return await call_next(request)
+def register_internal_token_middleware(application) -> None:
+    application.add_middleware(InternalTokenMiddleware)

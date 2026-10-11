@@ -9,7 +9,7 @@ class Account(Base):
     id = Column(BigInteger, primary_key=True)
     account_key = Column(CHAR(36), nullable=False, unique=True)
     customer_id = Column(Integer, ForeignKey("customer.id"), nullable=False, index=True)
-    customer = relationship("Customer", back_populates="accounts", lazy="selectin")
+    customer = relationship("Customer", back_populates="accounts")
     balance = Column(BigInteger, nullable=False, default=0)
     tier_code = Column(String(20), nullable=False, default="STANDARD", server_default="STANDARD")
     monthly_free_transfers_limit = Column(Integer, nullable=False, default=5, server_default="5")

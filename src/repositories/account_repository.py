@@ -1,12 +1,12 @@
+from sqlalchemy.orm import Session
 from uuid import uuid4
 
-from database import Context
 from models.account import Account
 
 
 class AccountRepository:
-    def __init__(self, context: Context) -> None:
-        self.session = context.db_session
+    def __init__(self, session: Session) -> None:
+        self.session = session
 
     def get_by_key(self, account_key: str, for_update: bool = False):
         query = self.session.query(Account).filter(Account.account_key == account_key)

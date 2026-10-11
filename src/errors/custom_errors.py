@@ -191,3 +191,25 @@ class BalanceOverflow(QIException):
         super().__init__("Destination Balance Overflow", self.code, 422,
                          "The transfer would exceed the maximum supported account balance.",
                          "A transferência excederia o saldo máximo permitido para a conta de destino.")
+
+
+class SourceCustomerNotActive(QIException):
+    code = "QIT002008"
+
+    def __init__(self, customer_key, current_status):
+        super().__init__(
+            "Source Customer Not Active", self.code, 422,
+            f"Source customer {customer_key} has status {current_status}.",
+            "O cliente da conta de origem não está ativo.",
+        )
+
+
+class DestinationCustomerNotActive(QIException):
+    code = "QIT002009"
+
+    def __init__(self, customer_key, current_status):
+        super().__init__(
+            "Destination Customer Not Active", self.code, 422,
+            f"Destination customer {customer_key} has status {current_status}.",
+            "O cliente da conta de destino não está ativo.",
+        )
