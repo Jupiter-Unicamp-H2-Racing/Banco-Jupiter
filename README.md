@@ -387,9 +387,4 @@ Boas práticas para a entrega e para o desenvolvimento:
 3. Não exponha a API diretamente à internet sem adicionar autenticação e autorização adequadas.
 4. Não use dados pessoais reais nos testes.
 5. Confirme a visibilidade do repositório no GitHub e revise os arquivos versionados antes de entregar.
-
-## Limitações conhecidas
-
-- O token é compartilhado entre serviços; não existe autenticação individual de clientes nem autorização por titular de conta.
-- Swagger, ReDoc e OpenAPI estão desabilitados; consulte as rotas acima e os JSON Schemas em `src/schemas/`.
-- O serviço externo de boletos é configurado por variáveis de ambiente. A disponibilidade desse serviço não é garantida pelo próprio Banco Jupiter.
+rviço externo de boletos é configurado por variáveis de ambiente. A disponibilidade desse serviço não é garantida pelo próprio Banco Jupiter.
