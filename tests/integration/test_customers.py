@@ -143,3 +143,73 @@ def test_list_customers_validates_query_params():
     assert RequestGenerator.GET_customers({"unknown": "1"})[0] == 400
     status, _ = RequestGenerator.GET_customers({"birthdate_from": "2000-01-01", "birthdate_to": "1990-01-01"})
     assert status in (400, 422)
+
+
+def test_email_is_case_insensitive_and_returned_lowercase():
+    email = f"maria.{uuid4()}@example.com"
+    payload = PayloadGenerator.create_customer_payload(email=email)
+    status, body = RequestGenerator.POST_customer(payload)
+    assert status == 201
+    assert RequestGenerator.POST_customer({**payload, "email": email.upper()})[0:1] == (409,)
+    key = body["customer_key"]
+    assert RequestGenerator.GET_customer(key)[1]["email"] == email.lower()
+    status, listing = RequestGenerator.GET_customers({"email": email.upper()})
+    assert status == 200
+    assert any(row["customer_key"] == key for row in listing["data"])
+
+
+def test_customer_name_only_whitespace_is_rejected():
+    payload = PayloadGenerator.create_customer_payload(name="   ")
+    assert RequestGenerator.POST_customer(payload)[0] == 400
+
+
+def test_customer_page_with_huge_integer_is_rejected():
+    assert RequestGenerator.GET_customers({"page": "99999999999999999999"})[0] == 400
+
+
+def test_parallel_status_updates_only_allow_one_transition():
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    key = ObjectGenerator.create_customer()
+    count = 8
+    barrier = Barrier(count)
+
+    def update(status):
+        barrier.wait()
+        return RequestGenerator.PUT_customer(key, {"status": status})[0]
+
+    with ThreadPoolExecutor(max_workers=count) as pool:
+        statuses = list(pool.map(update, ["active", "blocked"] * (count // 2)))
+    assert statuses.count(202) == 1
+    assert statuses.count(409) == count - 1
+    customer = RequestGenerator.GET_customer(key)[1]
+    assert len(customer["status_events"]) == 2
+    assert customer["status"] in {"active", "blocked"}
+
+
+def test_parallel_duplicate_customer_registration_never_returns_500():
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    for _ in range(5):
+        payload = PayloadGenerator.create_customer_payload()
+        count = 40
+        barrier = Barrier(count)
+
+        def create(_):
+            barrier.wait()
+            return RequestGenerator.POST_customer(payload)[0]
+
+        with ThreadPoolExecutor(max_workers=count) as pool:
+            statuses = list(pool.map(create, range(count)))
+        assert statuses.count(201) == 1
+        assert statuses.count(409) == count - 1
+        assert 500 not in statuses
+
+
+def test_name_percent_filter_is_literal_not_a_wildcard():
+    ObjectGenerator.create_customer()
+    status, listing = RequestGenerator.GET_customers({"name": "%"})
+    assert status == 200
+    assert listing["data"] == []

@@ -1,4 +1,7 @@
-from sqlalchemy import BigInteger, CHAR, CheckConstraint, Column, DateTime, ForeignKey, Index, desc, func
+from sqlalchemy import (
+    BigInteger, CHAR, CheckConstraint, Column, DateTime,
+    ForeignKey, Index, String, UniqueConstraint, desc, func,
+)
 from models.base import Base
 
 
@@ -7,6 +10,7 @@ class Transaction(Base):
 
     id = Column(BigInteger, primary_key=True)
     transaction_key = Column(CHAR(36), nullable=False, unique=True)
+    idempotency_key = Column(String(255), nullable=True)
     source_account_id = Column(BigInteger, ForeignKey("account.id"), nullable=False)
     destination_account_id = Column(BigInteger, ForeignKey("account.id"), nullable=False)
     amount = Column(BigInteger, nullable=False)
@@ -14,6 +18,7 @@ class Transaction(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
+    UniqueConstraint( "source_account_id","idempotency_key",name="uq_transaction_source_idempotency",),
         CheckConstraint("amount > 0", name="ck_transaction_amount_positive"),
         CheckConstraint("fee_amount >= 0", name="ck_transaction_fee_nonnegative"),
         CheckConstraint("source_account_id <> destination_account_id", name="ck_transaction_accounts_different"),

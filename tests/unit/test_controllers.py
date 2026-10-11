@@ -1,5 +1,5 @@
 """Regras de negócio dos controllers, com repositórios falsos (sem banco)."""
-from datetime import date, datetime, timezone
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -31,6 +31,7 @@ class FakeCustomerRepo:
     def get_by_document_number(self, _): return self.by_doc
     def get_by_email(self, _): return self.by_email
     def get_by_key(self, _): return self.existing
+    def get_by_key_for_update(self, _): return self.existing
 
     def create(self, data):
         self.created = SimpleNamespace(**{**data, "birthdate": date.fromisoformat(data["birthdate"])}, customer_key="k",

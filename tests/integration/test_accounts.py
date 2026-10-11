@@ -63,3 +63,26 @@ def test_get_account_404_for_unknown_key_and_requires_token():
     status, body = RequestGenerator.GET_account(str(uuid4()))
     assert (status, body["code"]) == (404, "QIT002001")
     assert RequestGenerator.POST_account({}, headers={})[0] == 403
+
+
+def test_initial_balance_bigint_limit_and_upper_bound():
+    customer_key = ObjectGenerator.create_active_customer()
+    status, _ = RequestGenerator.POST_account({"customer_key": customer_key, "initial_balance": 10**20})
+    assert status == 400
+    status, body = RequestGenerator.POST_account({"customer_key": customer_key, "initial_balance": 9223372036854775807})
+    assert status == 201
+    assert RequestGenerator.GET_account(body["account_key"])[1]["balance"] == 9223372036854775807
+
+
+def test_account_key_lookup_accepts_uppercase_uuid():
+    key = ObjectGenerator.create_account()
+    status, body = RequestGenerator.GET_account(key.upper())
+    assert status == 200
+    assert body["account_key"] == key.lower()
+
+
+def test_account_creation_accepts_uppercase_customer_uuid():
+    customer_key = ObjectGenerator.create_active_customer()
+    status, body = RequestGenerator.POST_account({"customer_key": customer_key.upper()})
+    assert status == 201
+    assert RequestGenerator.GET_account(body["account_key"])[1]["customer_key"] == customer_key.lower()

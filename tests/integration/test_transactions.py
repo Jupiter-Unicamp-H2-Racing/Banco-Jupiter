@@ -146,3 +146,29 @@ def test_concurrent_transfers_cannot_overdraw_the_source():
     assert statuses.count(422) == 5
     assert _balance(source) == 100
     assert _balance(destination) == 900
+
+
+def test_statement_max_date_and_huge_page_validation():
+    account = ObjectGenerator.create_account()
+    assert RequestGenerator.GET_transactions(account, {"end_date": "9999-12-31"})[0] == 200
+    assert RequestGenerator.GET_transactions(account, {"page": "99999999999999999999"})[0] == 400
+
+
+def test_destination_balance_overflow_is_rejected_without_changes():
+    source = ObjectGenerator.create_account(balance=9 * 10**18)
+    destination = ObjectGenerator.create_account(balance=9 * 10**18)
+    status, body = _transfer(source, destination, 10**18)
+    assert (status, body["code"]) == (422, "QIT002007")
+    assert (_balance(source), _balance(destination)) == (9 * 10**18, 9 * 10**18)
+
+
+def test_transfer_accepts_uppercase_destination_uuid():
+    source = ObjectGenerator.create_account(balance=1000)
+    destination = ObjectGenerator.create_account()
+    assert _transfer(source, destination.upper(), 10)[0] == 201
+
+
+def test_amount_above_bigint_is_rejected_by_schema():
+    source = ObjectGenerator.create_account(balance=1000)
+    destination = ObjectGenerator.create_account()
+    assert _transfer(source, destination, 10**20)[0] == 400

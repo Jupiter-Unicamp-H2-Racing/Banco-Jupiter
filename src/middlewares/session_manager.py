@@ -36,7 +36,7 @@ def register_session_manager_middleware(application: FastAPI) -> None:
     então commita. E seria errado.
 
     Quem sabe se o trabalho terminou é o controller, não a camada de
-    fora. Abra src/controllers/customers_controller.py: em `create` e
+    fora. Abra src/controllers/customer_controller.py: em `create` e
     em `update_status`, o `self.session.commit()` é a ÚLTIMA linha antes
     do `return` — depois que a regra passou, nunca antes.
 

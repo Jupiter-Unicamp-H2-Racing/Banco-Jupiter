@@ -1,9 +1,9 @@
 from datetime import date
+from sqlalchemy.exc import IntegrityError
 from controllers.base_controller import BaseController
 from dtos import CustomerDTO
 from errors import InvalidParameter
 from errors.custom_errors import DuplicatedDocumentNumber, DuplicatedEmail, InvalidBirthdate, InvalidDocumentNumber, NotFoundCustomer, CustomerFinalStatus, UnderageCustomer, OverAgeCustomer
-from models.customer import Customer
 from models.customer_status import CustomerStatus
 from repositories.customer_repository import CustomerRepository
 from utils.document_number import is_valid_cpf
@@ -19,7 +19,8 @@ class CustomerController(BaseController):
 
     def create(self, customer_data: dict) -> dict:
         document_number = customer_data["document_number"]
-        email = customer_data["email"]
+        email = customer_data["email"].strip().lower()
+        customer_data = {**customer_data, "email": email}
         birthdate = self._parse_birthdate(customer_data["birthdate"])
         age = self._age_in_years(birthdate)
         if age < MINIMUM_AGE:
@@ -32,11 +33,21 @@ class CustomerController(BaseController):
             raise DuplicatedDocumentNumber(document_number)
         if self.customer_repository.get_by_email(email):
             raise DuplicatedEmail(email)
-        customer = self.customer_repository.create(customer_data)
-        self.session.commit()
+        try:
+            customer = self.customer_repository.create(customer_data)
+            self.session.commit()
+        except IntegrityError as exc:
+            self.session.rollback()
+            constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+            if constraint in {"customer_document_number_key", "uq_customer_document_number"}:
+                raise DuplicatedDocumentNumber(document_number) from exc
+            if constraint in {"customer_email_key", "uq_customer_email_lower", "uq_customer_email"}:
+                raise DuplicatedEmail(email) from exc
+            raise
         return CustomerDTO.only_obj_key(customer)
 
     def get_by_key(self, customer_key: str) -> dict:
+        customer_key = customer_key.lower()
         customer = self.customer_repository.get_by_key(customer_key)
         if customer is None:
             raise NotFoundCustomer(customer_key)
@@ -56,7 +67,8 @@ class CustomerController(BaseController):
         return {"customers_list_dto": CustomerDTO.list_obj_to_list_dict(customers), "is_last_page": is_last_page}
 
     def update_status(self, customer_key: str, new_status: str) -> dict:
-        customer = self.customer_repository.get_by_key(customer_key)
+        customer_key = customer_key.lower()
+        customer = self.customer_repository.get_by_key_for_update(customer_key)
         if customer is None:
             raise NotFoundCustomer(customer_key)
         if new_status not in CustomerStatus.ALLOWED or new_status == CustomerStatus.PENDING_KYC:
@@ -73,7 +85,7 @@ class CustomerController(BaseController):
         except (TypeError, ValueError) as exc:
             raise InvalidBirthdate(value) from exc
         if parsed > date.today():
-            raise InvalidBirthdate(value)
+            raise InvalidBirthdate(value, future=True)
         return parsed
 
     @staticmethod

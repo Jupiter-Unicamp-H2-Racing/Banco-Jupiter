@@ -38,4 +38,6 @@ def main() -> FastAPI:
     setup_logging()
     return create_app()
 
+
+
 app = main()

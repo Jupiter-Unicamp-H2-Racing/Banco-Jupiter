@@ -60,11 +60,11 @@ class InvalidBirthdate(QIException):
 
     code = "QIT001007"
 
-    def __init__(self, birthdate) -> None:
+    def __init__(self, birthdate, future=False) -> None:
         title = "Invalid Birthdate"
         http_status = 422
-        description = f"The birthdate {birthdate} is not a real date."
-        translation = "A data de nascimento informada não existe."
+        description = (f"The birthdate {birthdate} cannot be in the future." if future else f"The birthdate {birthdate} is not a real date.")
+        translation = "A data de nascimento não pode estar no futuro." if future else "A data de nascimento informada não existe."
         super().__init__(title, self.code, http_status, description, translation)
 
 
@@ -102,29 +102,38 @@ class InvalidTransfer(QIException):
 
 # Erros canônicos do domínio Customer. Mantêm os códigos/contratos HTTP
 # já usados pela API, sem reaproveitar nomes da entidade removida.
+
+
 class NotFoundCustomer(QIException):
     code = "QIT001001"
+
     def __init__(self, customer_key):
         super().__init__("Customer not Found", self.code, 404,
                          f"Customer with key {customer_key} was not found.",
                          f"O cliente com chave {customer_key} não foi encontrado.")
 
+
 class CustomerFinalStatus(QIException):
     code = "QIT001002"
+
     def __init__(self, old_status, new_status):
         super().__init__("Customer cannot change status", self.code, 409,
                          f"Customer with status {old_status} cannot update to {new_status}.",
                          "Este cliente não pode ter o status alterado.")
 
+
 class UnderageCustomer(QIException):
     code = "QIT001006"
+
     def __init__(self, age, minimum_age):
         super().__init__("Customer is underage", self.code, 422,
                          f"The customer is {age} years old; minimum age is {minimum_age}.",
                          f"É preciso ter pelo menos {minimum_age} anos.")
 
+
 class OverAgeCustomer(QIException):
     code = "QIT001008"
+
     def __init__(self, age, maximum_age):
         super().__init__("Customer age exceeds limit", self.code, 422,
                          f"The customer is {age} years old; maximum age is {maximum_age}.",
@@ -152,6 +161,7 @@ class InvalidDateRange(QIException):
             "A data inicial do extrato deve ser anterior ou igual à data final.",
         )
 
+
 class CustomerNotActive(QIException):
     code = "QIT001009"
 
@@ -159,3 +169,25 @@ class CustomerNotActive(QIException):
         super().__init__("Customer is not active", self.code, 422,
                          f"Customer {customer_key} has status {current_status}.",
                          "Somente clientes ativos podem criar contas.")
+
+
+class IdempotencyConflict(QIException):
+    code = "QIT002006"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Idempotency Conflict",
+            self.code,
+            409,
+            "The idempotency key was already used for a different transfer.",
+            "A chave de idempotência já foi usada para outra transferência.",
+        )
+
+
+class BalanceOverflow(QIException):
+    code = "QIT002007"
+
+    def __init__(self) -> None:
+        super().__init__("Destination Balance Overflow", self.code, 422,
+                         "The transfer would exceed the maximum supported account balance.",
+                         "A transferência excederia o saldo máximo permitido para a conta de destino.")

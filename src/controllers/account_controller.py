@@ -15,6 +15,7 @@ class AccountController(BaseController):
         self.customer_repository = CustomerRepository(self.context)
 
     def create(self, payload: dict) -> dict:
+        payload = {**payload, "customer_key": payload["customer_key"].lower()}
         customer = self.customer_repository.get_by_key(payload["customer_key"])
         if customer is None:
             raise NotFoundCustomer(payload["customer_key"])
@@ -27,6 +28,7 @@ class AccountController(BaseController):
         return AccountDTO.only_obj_key(account)
 
     def get_by_key(self, account_key: str) -> dict:
+        account_key = account_key.lower()
         account = self.account_repository.get_by_key(account_key)
         if account is None:
             raise AccountNotFound(account_key)

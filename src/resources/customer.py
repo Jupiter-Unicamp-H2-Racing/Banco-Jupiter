@@ -1,4 +1,4 @@
-from fastapi import Request, Response
+from fastapi import Request
 from fastapi import status as http_status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
