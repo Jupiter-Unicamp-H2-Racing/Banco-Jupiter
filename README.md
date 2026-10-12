@@ -93,25 +93,8 @@ cd Banco-Jupiter
 
 Substitua `<URL_DO_REPOSITORIO>` pela URL real do repositório.
 
-### 2. Configurar variáveis de ambiente
 
-O Compose atual define valores padrão para algumas variáveis, inclusive `INTERNAL_TOKEN`. Para personalizar a configuração, crie um arquivo `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Edite o arquivo e configure pelo menos um `INTERNAL_TOKEN` próprio. Para gerar um valor aleatório:
-
-```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-Copie o resultado para a linha `INTERNAL_TOKEN=` no `.env`. Não compartilhe esse valor nem versione o arquivo `.env`.
-
-> **Importante:** no `docker-compose.yml` deste projeto, `INTERNAL_TOKEN` possui atualmente o valor padrão `default_token` quando não configurado. Esse padrão é conveniente para desenvolvimento, mas não é seguro para produção. Sempre configure um valor próprio e revise a configuração antes de disponibilizar o serviço em qualquer ambiente compartilhado.
-
-### 3. Construir e iniciar os serviços
+### 2. Construir e iniciar os serviços
 
 ```bash
 docker compose up -d --build
@@ -121,7 +104,7 @@ O Compose inicia a API e o PostgreSQL. A inicialização da API executa as migra
 
 Se sua instalação exigir permissões administrativas para Docker, use `sudo` antes dos comandos.
 
-### 4. Verificar os containers
+### 3. Verificar os containers
 
 ```bash
 docker compose ps
@@ -129,7 +112,7 @@ docker compose ps
 
 A API fica disponível em `http://localhost:3000` por padrão. O PostgreSQL é publicado na porta `5432` por padrão. As portas podem ser personalizadas pelas variáveis `API_PORT` e `DB_PORT` do `.env`.
 
-### 5. Verificar a API
+### 4. Verificar a API
 
 A rota raiz retorna a identificação do serviço:
 
