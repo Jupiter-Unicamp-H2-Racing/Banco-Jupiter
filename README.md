@@ -329,6 +329,7 @@ A imagem `api` instala as dependências de desenvolvimento e copia os testes par
 ### 1. Construir e iniciar
 
 ```bash
+cp .env.example .env
 sudo docker compose build api
 sudo docker compose up -d
 ```
