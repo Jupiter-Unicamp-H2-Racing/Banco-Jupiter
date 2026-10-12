@@ -114,7 +114,7 @@ Copie o resultado para a linha `INTERNAL_TOKEN=` no `.env`. Não compartilhe ess
 ### 3. Construir e iniciar os serviços
 
 ```bash
-docker compose up -d --build
+sudo docker compose up -d --build
 ```
 
 O Compose inicia a API e o PostgreSQL. A inicialização da API executa as migrations do Alembic antes de iniciar o servidor Uvicorn.
@@ -124,7 +124,7 @@ Se sua instalação exigir permissões administrativas para Docker, use `sudo` a
 ### 4. Verificar os containers
 
 ```bash
-docker compose ps
+sudo docker compose ps
 ```
 
 A API fica disponível em `http://localhost:3000` por padrão. O PostgreSQL é publicado na porta `5432` por padrão. As portas podem ser personalizadas pelas variáveis `API_PORT` e `DB_PORT` do `.env`.
@@ -146,13 +146,13 @@ curl -i http://localhost:3000/health_check
 ### 6. Consultar logs e parar os serviços
 
 ```bash
-docker compose logs -f api
+sudo docker compose logs -f api
 ```
 
 Para parar os containers:
 
 ```bash
-docker compose down
+sudo docker compose down
 ```
 
 Esse comando não remove o código-fonte. Antes de remover volumes ou recriar o banco, confirme se não há dados que precisem ser preservados.
@@ -329,36 +329,36 @@ A imagem `api` instala as dependências de desenvolvimento e copia os testes par
 ### 1. Construir e iniciar
 
 ```bash
-docker compose build api
-docker compose up -d
+sudo docker compose build api
+sudo docker compose up -d
 ```
 
 Espere os serviços ficarem saudáveis:
 
 ```bash
-docker compose ps
+sudo docker compose ps
 ```
 
 ### 2. Executar todos os testes dentro do container
 
 ```bash
-docker compose exec api python -m pytest /tests -v
+sudo docker compose exec api python -m pytest /tests -v
 ```
 
 ### 3. Executar com cobertura
 
 ```bash
-docker compose exec api python -m pytest /tests --cov=/app --cov-report=term-missing
+sudo docker compose exec api python -m pytest /tests --cov=/app --cov-report=term-missing
 ```
 
 ### 4. Executar apenas uma categoria ou arquivo
 
 ```bash
 # Testes de integração
-docker compose exec api python -m pytest /tests/integration -v
+sudo docker compose exec api python -m pytest /tests/integration -v
 
 # Um arquivo específico
-docker compose exec api python -m pytest /tests/integration/test_transactions.py -v
+sudo docker compose exec api python -m pytest /tests/integration/test_transactions.py -v
 ```
 
 Se o Docker estiver configurado para exigir privilégios administrativos, acrescente `sudo` aos comandos `docker compose`.
